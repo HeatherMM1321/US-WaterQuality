@@ -11,10 +11,10 @@ library(DT)
 library(ggplot2)
 library(dplyr)
 library(plotly)
-library(sf)
-library(sp)
-library(rgeos)
-library(rgdal)
+# library(sf)
+# library(sp)
+# library(rgeos)
+# library(rgdal)
 
 library(dataRetrieval)
 
@@ -90,15 +90,16 @@ body <- dashboardBody(
                      multiple = TRUE),
                    fluidRow(
                      column(5, offset = 0,
-                            uiOutput('sample_selection')
+                            uiOutput('sample_selection')), 
+                            
                             # numericInput('sample_num', "Min. sample # in each year.",
                             #              value = 0))
-                     # fluidRow(
-                     #   column(5, offset = 0,
-                     #          br(),
-                     #          actionButton('minsample', 'Enter')
+                     fluidRow(
+                       column(5, offset = 0,
+                              br(),
+                              uiOutput('watertype')
 
-                     )
+                     ))
                    
                    )), mainPanel(width =0))
     )),
@@ -155,8 +156,8 @@ body <- dashboardBody(
                                                  actionButton('clear_markers', 'Clear Locations')
                                           )
                                         )), mainPanel(width =0)),
-                           uiOutput('highvalue'),
-                           actionButton('thresholdvalue', 'Enter')
+                           uiOutput('highvalue')
+                           # actionButton('thresholdvalue', 'Enter')
                          )),
                        br(), 
                        span(textOutput('station'), style="font-size: 20px;font-weight:bold"),
@@ -269,8 +270,9 @@ server <- function(input, output) {
       
       ecoli_data <- readWQPdata(statecode=paste("US", statecode(), sep = ":"), characteristicName="Escherichia coli",
                                 startDateLo = input$dateRange[1],
-                                startDateHi = input$dateRange[2]) %>%
-        filter(ActivityMediaSubdivisionName == "Surface Water")
+                                startDateHi = input$dateRange[2]) 
+      # %>%
+        # filter(ActivityMediaSubdivisionName != "Ground Water")
       
       # merges the station info into the reported Ecoli results
       return(merge(site_data, ecoli_data, by = "MonitoringLocationIdentifier", all.y = TRUE))
@@ -286,6 +288,7 @@ server <- function(input, output) {
         select(StationID = MonitoringLocationIdentifier,
                StationName = MonitoringLocationName,
                ActivityIdentifier,
+               SampleType = ActivityMediaSubdivisionName,
                station_num,
                date = ActivityStartDate,
                time = ActivityStartTime.Time,
@@ -297,6 +300,7 @@ server <- function(input, output) {
                DetectionType = DetectionQuantitationLimitTypeName)%>%
         mutate(date = as.Date(date), lon = -abs(lon)) %>%
         rowwise() %>%
+        mutate(SampleType = replace_na(SampleType, "NA")) %>%  
         # convert the results into only the numeric value reported (cleans out any extra characters)
         mutate(ReportedEcoli = as.numeric(gsub("[^0-9.]", "",  ReportedEcoli))) %>%
         # uses detection limit rules to adjust results
@@ -371,6 +375,31 @@ server <- function(input, output) {
                 step = 1.0)
   })
   
+  sampletype <- reactive({
+    if(nrow(all_data()) == 0){
+      return()
+    }else{
+      watersamples <- cleaned_data() %>% 
+        select(SampleType) %>% 
+        unique()
+      return(watersamples$SampleType)
+    }
+  })
+  
+  output$watertype <- renderUI({
+    pickerInput(
+      inputId = "sample",
+      label = "Sample Types",
+      choices = sampletype(),
+      selected = "Surface Water",
+      options = list(
+        `actions-box` = TRUE,
+        size = 10,
+        `selected-text-format` = "count > 3"),
+      multiple = TRUE)
+    
+  })
+  
   # gives the month number
   month_number <- reactive({
     which(month_names %in% input$months)
@@ -384,11 +413,13 @@ server <- function(input, output) {
       return()
       }else if (is.null(input$huc8)){
       return(cleaned_data() %>% filter(year(date) %in% c(input$year[1]:input$year[2]),
-                          month(date) %in% month_number()))
+                          month(date) %in% month_number(), 
+                          SampleType %in% input$sample))
         }else{
           return(cleaned_data() %>% filter(HUC8 %in% input$huc8,
                             year(date) %in% c(input$year[1]:input$year[2]),
-                            month(date) %in% month_number()))
+                            month(date) %in% month_number(), 
+                            SampleType %in% input$sample))
     }
   })
 
@@ -457,6 +488,7 @@ server <- function(input, output) {
                StationID,
                StationName,
                ActivityID = ActivityIdentifier,
+               SampleType, 
                Latitude = lat,
                Longitude = lon,
                Date = date,
@@ -477,10 +509,17 @@ server <- function(input, output) {
   ##### Text Output and Map ####
         
   output$highvalue<- renderUI({
-          numericInput('threshold', "To see only stations that have high test results enter a E.coli threshold value (CFU/100 ml).",
-                       value = 0)
+          # numericInput('threshold', "To see only stations that have high test results enter a E.coli threshold value (CFU/100 ml).",
+          #              value = 0)
+        sliderInput("threshold", "Show only those stations with E. coli samples over this value (CFU/100 ml).",
+                min = 0,
+                max = max(narrowed_data()$Ecoli),
+                value= 0,
+                sep = "", 
+                step = 50)
+    
         })
-  
+
   output$MapDisplay <- renderUI({
     if(nrow(all_data()) == 0){
       textOutput("nodata")
@@ -523,7 +562,7 @@ server <- function(input, output) {
   ##### Events to Observe in the Station Information Tab ####
 
   # stations in selected watershed that comply with the user inputs (will not re-render the map only changes the markers)
-  observeEvent(list(input$year, month_number(), input$sample_num, input$huc8, input$tabs, input$thresholdvalue),
+  observeEvent(list(input$year, month_number(), input$sample_num, input$huc8, input$tabs, input$threshold),
                {
                  # resenting the station information asssigned to selecting a station 
                  click$clickedMarker <- NULL
@@ -535,6 +574,7 @@ server <- function(input, output) {
                      clearGroup('Stations Meeting Criteria') 
                  }else{
                    if(is.null(input$threshold)){
+
                      map_data <- selected_data_nsamples() %>%
                        select(StationID, station_num, lat, lon, HUC8 ) %>%
                        unique()
