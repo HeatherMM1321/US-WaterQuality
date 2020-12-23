@@ -26,6 +26,7 @@ library(tidyverse)
 # library(knitr)
 # library(kableExtra)
 library(dplyr)
+library(tidyverse)
 
 ```
 
