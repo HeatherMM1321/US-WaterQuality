@@ -797,44 +797,44 @@ server <- function(input, output) {
   })
   
   
-  # downloading a csv of table information
-  output$stationcsv <- downloadHandler(
-    filename = function(){
-      paste(selected_station()$StationID,"_ecoli.csv")
-    },
-    content = function(file){
-      write.csv(stationdatadownload(), file)
-    }
-  )
-
-  output$report <- downloadHandler(
-    filename = ("report.pdf"),
-
-    content = function(file){
-
-      tempReport <- file.path(tempdir(), "USStationReport.Rmd")
-      file.copy("USStationReport.Rmd", tempReport, overwrite = TRUE)
-
-      # Set up parameters to pass to Rmd document
-      params <- list(startdate = input$dateRange[1],
-                     enddate = input$dateRange[2],
-                     months = input$months,
-                     samples = n_samples(),
-                     chosensample = input$sample_num,
-                     station = selected_station()$StationID,
-                     gm = gm(),
-                     stv = stv(),
-                     station_num = click$clickedMarker,
-                     data = selected_data_nsamples(),
-                     name = selected_station()$StationName)
-
-      rmarkdown::render(tempReport, output_file = file,
-                        params = params,
-                        envir = new.env(parent = globalenv())
-      )
-
-    }
-  )
+  # # downloading a csv of table information
+  # output$stationcsv <- downloadHandler(
+  #   filename = function(){
+  #     paste(selected_station()$StationID,"_ecoli.csv")
+  #   },
+  #   content = function(file){
+  #     write.csv(stationdatadownload(), file)
+  #   }
+  # )
+  # 
+  # output$report <- downloadHandler(
+  #   filename = ("report.pdf"),
+  # 
+  #   content = function(file){
+  # 
+  #     tempReport <- file.path(tempdir(), "USStationReport.Rmd")
+  #     file.copy("USStationReport.Rmd", tempReport, overwrite = TRUE)
+  # 
+  #     # Set up parameters to pass to Rmd document
+  #     params <- list(startdate = input$dateRange[1],
+  #                    enddate = input$dateRange[2],
+  #                    months = input$months,
+  #                    samples = n_samples(),
+  #                    chosensample = input$sample_num,
+  #                    station = selected_station()$StationID,
+  #                    gm = gm(),
+  #                    stv = stv(),
+  #                    station_num = click$clickedMarker,
+  #                    data = selected_data_nsamples(),
+  #                    name = selected_station()$StationName)
+  # 
+  #     rmarkdown::render(tempReport, output_file = file,
+  #                       params = params,
+  #                       envir = new.env(parent = globalenv())
+  #     )
+  # 
+  #   }
+  # )
 
       }
 
