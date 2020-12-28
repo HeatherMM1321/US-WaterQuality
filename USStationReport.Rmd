@@ -23,10 +23,7 @@ params:
 ```{r, echo=FALSE}
 library(ggplot2)
 library(tidyverse)
-# library(knitr)
-# library(kableExtra)
 library(dplyr)
-library(tidyverse)
 
 ```
 
@@ -55,9 +52,8 @@ selected_month <- if(length(params$months)==12){
 
 ```{r, echo=FALSE}
 data <- params$data %>%
-            filter(station_num == params$station_num) %>% 
+            dplyr::filter(station_num == params$station_num) %>% 
             ungroup() %>% 
-            # select(HUC8, ActivityIdentifier, date, ReportedEcoli, DetectionValue, DetectionType, Ecoli, lat, lon)%>%
             arrange(date)
 
 data %>%
